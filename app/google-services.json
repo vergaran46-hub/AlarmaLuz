@@ -1,0 +1,68 @@
+{
+  "project_info": {
+    "project_number": "817284860229",
+    "firebase_url": "https://luzalarma-default-rtdb.firebaseio.com",
+    "project_id": "luzalarma",
+    "storage_bucket": "luzalarma.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:817284860229:android:e5f0e246ab1e592c06162c",
+        "android_client_info": {
+          "package_name": "com.example.alarmaluz"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyANmLWwpzjTizXnTnMho7OnswRH_IZJxak"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:817284860229:android:bd218f03885b4fd406162c",
+        "android_client_info": {
+          "package_name": "com.ignacio.alarmaluz"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyANmLWwpzjTizXnTnMho7OnswRH_IZJxak"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:817284860229:android:a16867f75b5612ad06162c",
+        "android_client_info": {
+          "package_name": "com.nacho.luzalarma"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyANmLWwpzjTizXnTnMho7OnswRH_IZJxak"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
