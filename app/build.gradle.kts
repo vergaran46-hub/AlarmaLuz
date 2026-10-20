@@ -11,7 +11,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.alarmaluz"
-        minSdk = 24
+        minSdk = 26  // VibrationEffect (vibración de la alarma) necesita Android 8+
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"

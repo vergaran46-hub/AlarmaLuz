@@ -4,6 +4,9 @@
 
     <!-- Necesario para Firebase (conexión cifrada por internet) -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Permisos normales (no se piden al usuario): saber si hay WiFi o datos, y vibrar -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.VIBRATE" />
 
     <application
         android:allowBackup="true"

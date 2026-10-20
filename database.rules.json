@@ -1,0 +1,13 @@
+{
+  "rules": {
+    "usuarios": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid",
+        "config": {
+          "umbral": { ".validate": "newData.isNumber() && newData.val() >= 10 && newData.val() <= 500" }
+        }
+      }
+    }
+  }
+}

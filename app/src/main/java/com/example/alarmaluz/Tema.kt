@@ -16,6 +16,9 @@ object C {
     val Rojo = Color(0xFFE5604F)
     val Texto = Color(0xFFF3EFE6)
     val Gris = Color(0xFFA9B4C6)
+    val Barra = Color(0xFF142033)
+    val Pista = Color(0xFF2A3A52)
+    val AmbarFondo = Color(0xFF2E2715)
 }
 
 // Tema Material 3 oscuro con nuestros colores (criterio 2.1.1.2: Material Design)

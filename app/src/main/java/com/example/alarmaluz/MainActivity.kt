@@ -4,12 +4,11 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -19,6 +18,7 @@ import androidx.navigation.compose.rememberNavController
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Repo.iniciar(this)
         setContent {
             LuzAlarmaTheme {
                 Box(Modifier.fillMaxSize().background(C.Fondo)) { App() }
@@ -27,36 +27,34 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+// A dónde ir: sin sesión -> login; sin rol en este celular -> elegir rol; si no, la pantalla de su rol
+fun destino(): String = when {
+    Repo.usuario == null -> "login"
+    Repo.rol == null -> "rol"
+    else -> Repo.rol!!
+}
+
+// Navega borrando el historial (para que "atrás" no vuelva al login o a otro rol)
+fun NavController.irLimpio(ruta: String) = navigate(ruta) { popUpTo(graph.id) { inclusive = true } }
+
 @Composable
 fun App() {
     val nav = rememberNavController()
-    // Si ya hay sesión iniciada, salta el login
-    val inicio = if (Repo.usuario != null) "inicio" else "login"
+    val inicio = remember { destino() }
 
     NavHost(navController = nav, startDestination = inicio) {
-        composable("login") {
-            LoginScreen(alIngresar = {
-                // popUpTo: borra el login del historial, así "atrás" no vuelve a él
-                nav.navigate("inicio") { popUpTo("login") { inclusive = true } }
-            })
+        composable("login") { LoginScreen(alIngresar = { nav.irLimpio(destino()) }) }
+        composable("rol") { RolScreen(alElegir = { nav.irLimpio(destino()) }) }
+        // Celular Activador
+        composable("activador") { ActivadorScreen(nav, alCambiarRol = { Repo.registrarDispositivo(); nav.irLimpio(destino()) }) }
+        composable("conexiones") { ConexionesScreen(nav, alSalir = { nav.irLimpio("login") }) }
+        // Celular Monitoreo
+        composable("monitoreo") { MonitoreoScreen(nav) }
+        composable("historial") { HistorialScreen(nav) }
+        composable("config") {
+            ConfigScreen(nav,
+                alSalir = { nav.irLimpio("login") },
+                alCambiarRol = { Repo.registrarDispositivo(); nav.irLimpio(destino()) })
         }
-        composable("inicio") { InicioTemporal(nav) }
-    }
-}
-
-// Pantalla provisoria para probar el login. En la parte 2 se reemplaza.
-@Composable
-fun InicioTemporal(nav: NavController) {
-    Column(
-        Modifier.fillMaxSize().systemBarsPadding().padding(24.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text("Sesión iniciada como ${Repo.usuario?.email}")
-        Spacer(Modifier.height(16.dp))
-        OutlinedButton(onClick = {
-            Repo.cerrarSesion()
-            nav.navigate("login") { popUpTo("inicio") { inclusive = true } }
-        }) { Text("Cerrar sesión") }
     }
 }
