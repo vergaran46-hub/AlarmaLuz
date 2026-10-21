@@ -130,3 +130,15 @@ fun tipoRed(ctx: Context): String {
         else -> "Otra red"
     }
 }
+
+// En línea = marcado online Y con un latido en los últimos 60 s.
+// (Firebase puede tardar minutos en notar un corte brusco, como el modo avión.)
+fun enLineaReciente(c: Conexion, ahora: Long) = c.online && ahora - c.ultimoDato < 60_000
+
+// Latido: cada 20 s este celular avisa "sigo conectado"
+@Composable
+fun Latido(enLinea: Boolean) {
+    LaunchedEffect(enLinea) {
+        while (enLinea) { Repo.marcarDato(); delay(20_000) }
+    }
+}

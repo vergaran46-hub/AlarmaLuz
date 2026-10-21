@@ -28,13 +28,15 @@ val pestanasMonitoreo = listOf(
 @Composable
 fun MonitoreoScreen(nav: NavController) {
     val ctx = LocalContext.current
-    val estado = datoEnVivo(Repo.ref("estado"), Estado())
-    val config = datoEnVivo(Repo.ref("config"), Config())
-    val conexiones = listaEnVivo(Repo.ref("conexiones"), Conexion::class.java)
-    val historial = listaEnVivo(Repo.ref("historial"), Evento::class.java)
+    val estado = datoEnVivo(Repo.refAlarma("estado"), Estado())                 // luz y armada (del admin)
+    val yo = datoEnVivo(Repo.refAlarma("miembros/${Repo.uid}"), Miembro())       // MI umbral y si me suena
+    val config = datoEnVivo(Repo.refUsuario("config"), Config())                // mis preferencias
+    val conexiones = listaEnVivo(Repo.refAlarma("conexiones"), Conexion::class.java).map { it.second }
+    val historial = listaEnVivo(Repo.refAlarma("historial/${Repo.uid}"), Evento::class.java).map { it.second }
     val enLinea = datoEnVivo(Repo.conectado, false)
-    val activadorOnline = conexiones.any { it.rol == "activador" && it.online }
-    val t = ahora(30_000)
+    val t = ahora(5_000)
+    val activadorOnline = conexiones.any { it.rol == "activador" && enLineaReciente(it, t) }
+    Latido(enLinea)
 
     LaunchedEffect(enLinea) { if (enLinea) Repo.registrarDispositivo() }
     LaunchedEffect(estado) { Repo.marcarDato() }   // "último dato recibido" para la pantalla Conexiones
@@ -44,8 +46,8 @@ fun MonitoreoScreen(nav: NavController) {
     DisposableEffect(Unit) { vista.keepScreenOn = true; onDispose { vista.keepScreenOn = false } }
 
     // ALARMA: cuando el Activador marca "sonando", este celular suena, vibra y parpadea la linterna
-    LaunchedEffect(estado.sonando) {
-        if (!estado.sonando) return@LaunchedEffect
+    LaunchedEffect(yo.sonando) {
+        if (!yo.sonando) return@LaunchedEffect
         Alarma.sonar(ctx, config)
         try {
             var prendida = false
@@ -58,18 +60,18 @@ fun MonitoreoScreen(nav: NavController) {
 
     // Hora estimada según el pronóstico solar (Open-Meteo); se recalcula cada hora
     var estimada by remember { mutableStateOf<Long?>(null) }
-    LaunchedEffect(config.lat, config.lon, config.umbral, t / 3_600_000) {
-        estimada = Sol.horaEstimada(config.lat, config.lon, config.umbral)
+    LaunchedEffect(config.lat, config.lon, yo.umbral, t / 3_600_000) {
+        estimada = Sol.horaEstimada(config.lat, config.lon, yo.umbral)
     }
 
     fun apagar() {
-        if (!estado.sonando) return
-        Repo.agregarEvento(Evento("sono", estado.sonoEn, System.currentTimeMillis(), estado.luzAlSonar))
-        Repo.actualizar("estado", mapOf("sonando" to false))   // se apaga en todos los celulares
+        if (!yo.sonando) return
+        Repo.agregarEvento(Repo.uid, Evento("sono", yo.sonoEn, System.currentTimeMillis(), yo.luzAlSonar))
+        Repo.actualizar(Repo.refAlarma("miembros/${Repo.uid}"), mapOf("sonando" to false))  // en todos MIS celulares
     }
 
     Pantalla(nav, "monitoreo", pestanasMonitoreo) {
-        Encabezado("Buenos días", "Hola, ${Repo.usuario?.email?.substringBefore("@")}") {
+        Encabezado("Alarma de ${estado.admin.ifEmpty { "…" }}", "Hola, ${Repo.email.substringBefore("@")}") {
             when {
                 !enLinea -> ChipConexion(false, "")                       // este celular sin internet
                 activadorOnline -> ChipConexion(true, "Activador en línea")
@@ -82,7 +84,7 @@ fun MonitoreoScreen(nav: NavController) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Luz actual en tu pieza", color = C.Gris, modifier = Modifier.weight(1f))
                 when {
-                    estado.sonando -> Chip("SONANDO", C.Rojo, C.AmbarFondo)
+                    yo.sonando -> Chip("SONANDO", C.Rojo, C.AmbarFondo)
                     estado.armada -> Chip("ARMADA", C.Ambar, C.AmbarFondo)
                     else -> Chip("DESARMADA", C.Gris, C.Pista)
                 }
@@ -92,12 +94,12 @@ fun MonitoreoScreen(nav: NavController) {
                 Text("  lux", fontSize = 20.sp, color = C.Gris, modifier = Modifier.padding(bottom = 12.dp))
             }
             LinearProgressIndicator(
-                progress = { (estado.luz.toFloat() / config.umbral).coerceIn(0f, 1f) },
+                progress = { (estado.luz.toFloat() / yo.umbral).coerceIn(0f, 1f) },
                 modifier = Modifier.fillMaxWidth().height(10.dp), color = C.Ambar, trackColor = C.Pista
             )
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text("0", color = C.Gris, fontSize = 12.sp)
-                Text("Suena a los ${config.umbral} lux", color = C.Gris, fontSize = 12.sp)
+                Text("Te suena a los ${yo.umbral} lux", color = C.Gris, fontSize = 12.sp)
             }
         }
 
@@ -132,7 +134,7 @@ fun MonitoreoScreen(nav: NavController) {
 
         // Botón grande para apagar (envía la orden al otro celular)
         Button(
-            onClick = { apagar() }, enabled = estado.sonando,
+            onClick = { apagar() }, enabled = yo.sonando,
             colors = ButtonDefaults.buttonColors(containerColor = C.Rojo, contentColor = C.Texto,
                 disabledContainerColor = C.Tarjeta, disabledContentColor = C.Gris),
             shape = RoundedCornerShape(32.dp), modifier = Modifier.fillMaxWidth().height(64.dp)
@@ -146,7 +148,7 @@ fun MonitoreoScreen(nav: NavController) {
 @OptIn(ExperimentalMaterial3Api::class)   // FilterChip
 @Composable
 fun HistorialScreen(nav: NavController) {
-    val historial = listaEnVivo(Repo.ref("historial"), Evento::class.java)
+    val historial = listaEnVivo(Repo.refAlarma("historial/${Repo.uid}"), Evento::class.java).map { it.second }
     var mes by remember { mutableStateOf(false) }   // false = esta semana, true = este mes
     val desde = System.currentTimeMillis() - (if (mes) 30L else 7L) * 86_400_000
     val lista = historial.filter { it.sonoEn >= desde }.sortedByDescending { it.sonoEn }

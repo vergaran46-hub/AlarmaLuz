@@ -1,11 +1,35 @@
 {
   "rules": {
+    "codigos": {
+      "$codigo": {
+        ".read": "auth != null",
+        ".write": "auth != null && !data.exists() && newData.val() === auth.uid"
+      }
+    },
     "usuarios": {
       "$uid": {
         ".read": "auth != null && auth.uid === $uid",
-        ".write": "auth != null && auth.uid === $uid",
-        "config": {
-          "umbral": { ".validate": "newData.isNumber() && newData.val() >= 10 && newData.val() <= 500" }
+        ".write": "auth != null && auth.uid === $uid"
+      }
+    },
+    "alarmas": {
+      "$admin": {
+        ".read": "auth != null && (auth.uid === $admin || data.child('miembros').child(auth.uid).exists())",
+        "codigo": { ".write": "auth != null && auth.uid === $admin" },
+        "estado": { ".write": "auth != null && auth.uid === $admin" },
+        "miembros": {
+          "$uid": {
+            ".write": "auth != null && (auth.uid === $uid || auth.uid === $admin)",
+            "umbral": { ".validate": "newData.isNumber() && newData.val() >= 10 && newData.val() <= 500" }
+          }
+        },
+        "conexiones": {
+          "$celular": {
+            ".write": "auth != null && (auth.uid === $admin || root.child('alarmas').child($admin).child('miembros').child(auth.uid).exists())"
+          }
+        },
+        "historial": {
+          "$uid": { ".write": "auth != null && (auth.uid === $uid || auth.uid === $admin)" }
         }
       }
     }

@@ -31,6 +31,8 @@ class MainActivity : ComponentActivity() {
 fun destino(): String = when {
     Repo.usuario == null -> "login"
     Repo.rol == null -> "rol"
+    Repo.rol == "activador" && Repo.alarma == null -> { Repo.serActivador(); "activador" }
+    Repo.rol == "monitoreo" && Repo.alarma == null -> "unirse"   // falta el código del admin
     else -> Repo.rol!!
 }
 
@@ -45,6 +47,9 @@ fun App() {
     NavHost(navController = nav, startDestination = inicio) {
         composable("login") { LoginScreen(alIngresar = { nav.irLimpio(destino()) }) }
         composable("rol") { RolScreen(alElegir = { nav.irLimpio(destino()) }) }
+        composable("unirse") {
+            UnirseScreen(alUnirse = { nav.irLimpio(destino()) }, alVolver = { Repo.rol = null; nav.irLimpio(destino()) })
+        }
         // Celular Activador
         composable("activador") { ActivadorScreen(nav, alCambiarRol = { Repo.registrarDispositivo(); nav.irLimpio(destino()) }) }
         composable("conexiones") { ConexionesScreen(nav, alSalir = { nav.irLimpio("login") }) }

@@ -23,12 +23,14 @@ private val sonidos = listOf("Alarma", "Notificación", "Tono")
 
 @Composable
 fun ConfigScreen(nav: NavController, alSalir: () -> Unit, alCambiarRol: () -> Unit) {
-    val config = datoEnVivo(Repo.ref("config"), Config())
+    val config = datoEnVivo(Repo.refUsuario("config"), Config())                 // preferencias personales
+    val yo = datoEnVivo(Repo.refAlarma("miembros/${Repo.uid}"), Miembro())      // mi umbral en esta alarma
+    val estado = datoEnVivo(Repo.refAlarma("estado"), Estado())
     // Valor local del slider; se guarda en Firebase solo al soltarlo
-    var umbral by remember(config.umbral) { mutableFloatStateOf(config.umbral.toFloat()) }
+    var umbral by remember(yo.umbral) { mutableFloatStateOf(yo.umbral.toFloat()) }
     var estimada by remember { mutableStateOf<Long?>(null) }
-    LaunchedEffect(config.umbral, config.lat, config.lon) { estimada = Sol.horaEstimada(config.lat, config.lon, config.umbral) }
-    fun guardar(campo: String, valor: Any) = Repo.actualizar("config", mapOf(campo to valor))
+    LaunchedEffect(yo.umbral, config.lat, config.lon) { estimada = Sol.horaEstimada(config.lat, config.lon, yo.umbral) }
+    fun guardar(campo: String, valor: Any) = Repo.actualizar(Repo.refUsuario("config"), mapOf(campo to valor))
 
     Pantalla(nav, "config", pestanasMonitoreo) {
         Text("Configuración", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
@@ -41,7 +43,9 @@ fun ConfigScreen(nav: NavController, alSalir: () -> Unit, alCambiarRol: () -> Un
             }
             Slider(
                 value = umbral, onValueChange = { umbral = it }, valueRange = 10f..500f,
-                onValueChangeFinished = { guardar("umbral", umbral.roundToInt()) }
+                onValueChangeFinished = {   // el umbral va en la alarma: el Activador lo usa para hacerme sonar
+                    Repo.actualizar(Repo.refAlarma("miembros/${Repo.uid}"), mapOf("umbral" to umbral.roundToInt()))
+                }
             )
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text("Poca luz", color = C.Gris, fontSize = 12.sp); Text("Mucha luz", color = C.Gris, fontSize = 12.sp)
@@ -50,7 +54,7 @@ fun ConfigScreen(nav: NavController, alSalir: () -> Unit, alCambiarRol: () -> Un
                 val e = estimada
                 Text(
                     if (e == null) "No se pudo estimar la hora con este umbral"
-                    else "Con ${config.umbral} lux, tu alarma sonará entre las ${hora(e - 600_000)} y ${hora(e + 600_000)} según la luz solar de tu zona.",
+                    else "Con ${yo.umbral} lux, tu alarma sonará entre las ${hora(e - 600_000)} y ${hora(e + 600_000)} según la luz solar de tu zona.",
                     color = C.Texto, fontSize = 13.sp, modifier = Modifier.padding(12.dp)
                 )
             }
@@ -60,21 +64,28 @@ fun ConfigScreen(nav: NavController, alSalir: () -> Unit, alCambiarRol: () -> Un
         Tarjeta {
             Menu("Ubicación", config.ciudad, ciudades.map { it.first }) { nombre ->
                 val c = ciudades.first { it.first == nombre }
-                Repo.actualizar("config", mapOf("ciudad" to c.first, "lat" to c.second, "lon" to c.third))
+                Repo.actualizar(Repo.refUsuario("config"), mapOf("ciudad" to c.first, "lat" to c.second, "lon" to c.third))
             }
             Interruptor("Vibración", config.vibracion) { guardar("vibracion", it) }
             Interruptor("Linterna parpadea", config.linterna) { guardar("linterna", it) }
             Menu("Sonido", config.sonido, sonidos) { guardar("sonido", it) }
         }
 
+        // Alarma a la que estoy unido
+        Tarjeta {
+            Text("Alarma", fontWeight = FontWeight.Bold)
+            Text("Unido a la alarma de ${estado.admin.ifEmpty { "…" }}", color = C.Gris)
+            TextButton(onClick = { Repo.salirDeAlarma(); alCambiarRol() }) { Text("Salir de esta alarma / unirme a otra") }
+        }
+
         // Rol de este celular (radio buttons)
         Tarjeta {
             Text("Este celular funciona como", fontWeight = FontWeight.Bold)
             Row {
-                listOf("activador" to "Activador", "monitoreo" to "Monitoreo").forEach { (valor, texto) ->
-                    Row(Modifier.weight(1f).clickable { if (valor != Repo.rol) { Repo.rol = valor; alCambiarRol() } },
-                        verticalAlignment = Alignment.CenterVertically) {
-                        RadioButton(selected = Repo.rol == valor, onClick = { if (valor != Repo.rol) { Repo.rol = valor; alCambiarRol() } })
+                listOf("activador" to "Activador (admin)", "monitoreo" to "Monitoreo").forEach { (valor, texto) ->
+                    val elegir = { if (valor == "activador" && Repo.rol != valor) { Repo.serActivador(); alCambiarRol() } }
+                    Row(Modifier.weight(1f).clickable { elegir() }, verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(selected = Repo.rol == valor, onClick = { elegir() })
                         Text(texto)
                     }
                 }
@@ -121,8 +132,12 @@ fun RolScreen(alElegir: () -> Unit) {
     ) {
         Text("¿Cómo usarás este celular?", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold)
         Text("Puedes cambiarlo después en Configuración.", color = C.Gris)
-        OpcionRol("Activador", "Queda junto a la ventana y mide la luz.") { Repo.rol = "activador"; alElegir() }
-        OpcionRol("Monitoreo", "Lo tienes tú: muestra la luz y aquí suena la alarma.") { Repo.rol = "monitoreo"; alElegir() }
+        OpcionRol("Activador (admin)", "Queda junto a la ventana, mide la luz y ve quién está conectado. Crea un código para que otros se unan.") {
+            Repo.serActivador(); alElegir()
+        }
+        OpcionRol("Monitoreo", "Lo tienes tú: te muestra la luz y aquí suena tu alarma. Te unes con el código del admin.") {
+            Repo.rol = "monitoreo"; alElegir()
+        }
     }
 }
 
@@ -131,5 +146,36 @@ private fun OpcionRol(titulo: String, texto: String, alTocar: () -> Unit) {
     Tarjeta(Modifier.clickable(onClick = alTocar)) {
         Text(titulo, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = C.Ambar)
         Text(texto, color = C.Gris)
+    }
+}
+
+// Monitoreo sin alarma: escribe el código que muestra el Activador del admin
+@Composable
+fun UnirseScreen(alUnirse: () -> Unit, alVolver: () -> Unit) {
+    var codigo by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf<String?>(null) }
+    var cargando by remember { mutableStateOf(false) }
+    Column(
+        Modifier.fillMaxSize().systemBarsPadding().padding(24.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically)
+    ) {
+        Text("Únete a una alarma", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold)
+        Text("Escribe el código de 6 letras que aparece en el celular Activador del admin.", color = C.Gris)
+        OutlinedTextField(
+            value = codigo, onValueChange = { codigo = it.uppercase().take(6) },
+            label = { Text("Código de la alarma") }, singleLine = true, modifier = Modifier.fillMaxWidth()
+        )
+        error?.let { Text(it, color = C.Rojo) }
+        Button(
+            onClick = {
+                cargando = true
+                Repo.unirse(codigo) { msg -> cargando = false; if (msg == null) alUnirse() else error = msg }
+            },
+            enabled = codigo.length == 6 && !cargando, shape = RoundedCornerShape(27.dp),
+            modifier = Modifier.fillMaxWidth().height(54.dp)
+        ) { Text(if (cargando) "Uniendo…" else "Unirme", fontWeight = FontWeight.Bold) }
+        TextButton(onClick = alVolver, modifier = Modifier.align(Alignment.CenterHorizontally)) {
+            Text("Volver a elegir el modo de este celular", color = C.Gris)
+        }
     }
 }
